@@ -4,9 +4,12 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "npx convex dev --once && concurrently -r npm:dev:web npm:dev:db",
+    "dev": "concurrently \"bun run dev:convex\" \"bun run dev:web\"",
+    "dev:convex": "convex dev",
     "dev:web": "vinxi dev",
     "dev:db": "convex dev --run board:seed",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "build": "vinxi build",
     "start": "vinxi start"
   },
