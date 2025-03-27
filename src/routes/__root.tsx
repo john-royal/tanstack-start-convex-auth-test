@@ -13,8 +13,8 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { useServerFn } from "@tanstack/react-start";
-import { AuthTokenFetcher, useConvex } from "convex/react";
-import { useEffect, useRef } from "react";
+import { useConvex } from "convex/react";
+import { useEffect, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { IconLink } from "~/components/IconLink";
@@ -172,44 +172,96 @@ function LoadingIndicator() {
 }
 
 function AuthEffects() {
-  const state = useRouteContext({ from: "__root__", select: (m) => m.auth });
-  const router = useRouter();
   const convex = useConvex();
+  const router = useRouter();
+
+  const _routerState = useRouteContext({
+    from: "__root__",
+    select: (m) => m.auth,
+  });
+  const [isInvalidating, setIsInvalidating] = useState(false);
+  const routerState: AuthState | undefined = isInvalidating
+    ? undefined
+    : _routerState;
+  const invalidate = useStableCallback(async () => {
+    setIsInvalidating(true);
+    await router.invalidate();
+    setIsInvalidating(false);
+  });
 
   const fetchServerAuthState = useStableCallback(
     useServerFn(getServerAuthState)
   );
 
-  const stateRef = useRef(state);
-
   useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
+    console.debug("[auth] setting auth");
 
-  useEffect(() => {
-    const fetchAccessToken: AuthTokenFetcher = async (opts) => {
+    const controller = new AbortController();
+
+    const fetchAccessToken = async (opts: { forceRefreshToken?: boolean }) => {
       if (
-        !opts.forceRefreshToken ||
-        stateRef.current.fetchedAt > Date.now() - 1000 * 30
+        !opts.forceRefreshToken &&
+        routerState &&
+        Date.now() - routerState.fetchedAt < 1000 * 30
       ) {
-        return stateRef.current.accessToken;
+        console.debug("[auth] returning cached token");
+        return routerState.accessToken;
       }
+
       const newState = await fetchServerAuthState({
-        data: opts,
+        signal: controller.signal,
       });
-      if (newState.isAuthenticated !== stateRef.current.isAuthenticated) {
-        await router.invalidate();
-      }
-      stateRef.current = newState;
+      console.debug("[auth] fetched new token");
+      localStorage.setItem("auth_state", JSON.stringify(newState));
       return newState.accessToken;
     };
 
-    convex.setAuth(fetchAccessToken);
+    convex.setAuth(fetchAccessToken, async (isAuthenticated) => {
+      if (
+        !controller.signal.aborted &&
+        isAuthenticated !== routerState?.isAuthenticated
+      ) {
+        console.debug("[auth] invalidating router");
+        await invalidate();
+      }
+    });
 
     return () => {
-      convex.clearAuth();
+      controller.abort("unmounting");
     };
-  }, [convex, router]);
+  }, [convex, routerState?.updatedAt]);
+
+  useEffect(() => {
+    if (!routerState) return;
+
+    const storedStateString = localStorage.getItem("auth_state");
+    const storedState = storedStateString
+      ? (JSON.parse(storedStateString) as AuthState)
+      : null;
+    if (!storedState || routerState.updatedAt > storedState.updatedAt) {
+      console.debug("[auth] updating stored state");
+      localStorage.setItem("auth_state", JSON.stringify(routerState));
+    }
+
+    let ignore = false;
+
+    const handleStorage = async (event: StorageEvent) => {
+      if (event.key === "auth_state" && event.newValue) {
+        const state = JSON.parse(event.newValue) as AuthState;
+        if (!ignore && state.isAuthenticated !== routerState.isAuthenticated) {
+          console.debug("[auth] invalidating router from storage");
+          await invalidate();
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      ignore = true;
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [routerState]);
 
   return null;
 }

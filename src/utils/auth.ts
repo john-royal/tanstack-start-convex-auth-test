@@ -3,9 +3,16 @@ import { generateHmac } from "convex/auth/crypto";
 import { AuthRequest, AuthResponse } from "convex/http";
 import invariant from "tiny-invariant";
 
+interface UnauthenticatedSession {
+  type: "unauthenticated";
+  updatedAt: number;
+}
+
 interface ChallengeSession {
   type: "challenge";
   state: string;
+  updatedAt: number;
+  redirectTo?: string;
 }
 
 interface TokenSession {
@@ -13,10 +20,13 @@ interface TokenSession {
   accessToken: string;
   accessTokenExpiresAt: number;
   refreshToken: string;
+  updatedAt: number;
 }
 
+export type SessionAPI = Awaited<ReturnType<typeof getAppSession>>;
+
 export function getAppSession() {
-  return useSession<ChallengeSession | TokenSession>({
+  return useSession<ChallengeSession | TokenSession | UnauthenticatedSession>({
     password: requireEnv("SESSION_SECRET"),
   });
 }
