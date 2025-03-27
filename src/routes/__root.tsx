@@ -1,25 +1,31 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools/production";
 import {
+  HeadContent,
   Link,
   Outlet,
-  createRootRouteWithContext,
-  useRouterState,
-  HeadContent,
   Scripts,
+  createRootRouteWithContext,
+  useRouteContext,
+  useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import { useServerFn } from "@tanstack/react-start";
+import { AuthTokenFetcher, useConvex } from "convex/react";
 import * as React from "react";
 import { Toaster } from "react-hot-toast";
-import type { QueryClient } from "@tanstack/react-query";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { IconLink } from "~/components/IconLink";
+import { Loader } from "~/components/Loader";
 import { NotFound } from "~/components/NotFound";
 import appCss from "~/styles/app.css?url";
+import { type AuthState, getServerAuthState } from "~/utils/actions";
 import { seo } from "~/utils/seo";
-import { Loader } from "~/components/Loader";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
+  auth: AuthState;
 }>()({
   head: () => ({
     meta: [
@@ -66,6 +72,14 @@ export const Route = createRootRouteWithContext<{
       </RootDocument>
     );
   },
+  beforeLoad: async ({ context }) => {
+    const promise =
+      (context.auth as unknown as Promise<AuthState> | undefined) ??
+      getServerAuthState();
+    return {
+      auth: await promise,
+    };
+  },
   notFoundComponent: () => <NotFound />,
   component: RootComponent,
 });
@@ -73,6 +87,7 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   return (
     <RootDocument>
+      <AuthEffects />
       <Outlet />
     </RootDocument>
   );
@@ -152,4 +167,46 @@ function LoadingIndicator() {
       <Loader />
     </div>
   );
+}
+
+function AuthEffects() {
+  const state = useRouteContext({ from: "__root__", select: (m) => m.auth });
+  const router = useRouter();
+  const convex = useConvex();
+
+  const stateRef = React.useRef(state);
+  const fetchServerAuthState = useServerFn(getServerAuthState);
+
+  React.useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  React.useEffect(() => {
+    const fetchAccessToken: AuthTokenFetcher = async (opts) => {
+      if (
+        !opts.forceRefreshToken ||
+        stateRef.current.fetchedAt > Date.now() - 1000 * 30
+      ) {
+        return stateRef.current.accessToken;
+      }
+      const newState = await fetchServerAuthState({
+        data: opts,
+      });
+      stateRef.current = newState;
+      return newState.accessToken;
+    };
+    const onAuthStateChange = (isAuthenticated: boolean) => {
+      if (isAuthenticated !== state.isAuthenticated) {
+        router.invalidate();
+      }
+    };
+
+    convex.setAuth(fetchAccessToken, onAuthStateChange);
+
+    return () => {
+      convex.clearAuth();
+    };
+  }, [convex, router, fetchServerAuthState, state.isAuthenticated]);
+
+  return null;
 }

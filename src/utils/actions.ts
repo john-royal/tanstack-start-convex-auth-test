@@ -3,31 +3,63 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { fetchAuth, getAppSession } from "~/utils/auth";
 
-export const getSession = createServerFn().handler(async () => {
-  const session = await getAppSession();
-  if (session.data.type !== "tokens") {
-    throw redirect({ to: "/auth" });
-  }
-  if (session.data.accessTokenExpiresAt < Date.now() - 1000 * 60) {
-    try {
-      const tokens = await fetchAuth({
-        action: "refresh",
-        refreshToken: session.data.refreshToken,
-      });
-      await session.update({
-        type: "tokens",
-        ...tokens,
-      });
-    } catch {
-      await session.clear();
-      throw redirect({ to: "/auth" });
+export type AuthState =
+  | {
+      isAuthenticated: true;
+      accessToken: string;
+      fetchedAt: number;
     }
-  }
-  return {
-    accessToken: session.data.accessToken,
-    expiresAt: session.data.accessTokenExpiresAt,
-  };
-});
+  | {
+      isAuthenticated: false;
+      accessToken: null;
+      fetchedAt: number;
+    };
+
+export const getServerAuthState = createServerFn()
+  .validator(
+    z
+      .object({
+        forceRefreshToken: z.boolean().optional(),
+      })
+      .optional()
+  )
+  .handler(async ({ data }): Promise<AuthState> => {
+    const session = await getAppSession();
+    if (session.data.type !== "tokens") {
+      return {
+        isAuthenticated: false,
+        accessToken: null,
+        fetchedAt: Date.now(),
+      };
+    }
+    if (
+      session.data.accessTokenExpiresAt < Date.now() - 1000 * 60 ||
+      data?.forceRefreshToken
+    ) {
+      try {
+        const tokens = await fetchAuth({
+          action: "refresh",
+          refreshToken: session.data.refreshToken,
+        });
+        await session.update({
+          type: "tokens",
+          ...tokens,
+        });
+      } catch {
+        await session.clear();
+        return {
+          isAuthenticated: false,
+          accessToken: null,
+          fetchedAt: Date.now(),
+        };
+      }
+    }
+    return {
+      isAuthenticated: true,
+      accessToken: session.data.accessToken,
+      fetchedAt: Date.now(),
+    };
+  });
 
 export const redirectToGitHub = createServerFn().handler(async () => {
   const json = await fetchAuth({ action: "authorize" });

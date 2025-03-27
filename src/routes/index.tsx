@@ -1,21 +1,31 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { api } from "convex/_generated/api";
 import { Loader } from "~/components/Loader";
-import { getSession, signOut } from "~/utils/actions";
+import { signOut } from "~/utils/actions";
 
 export const Route = createFileRoute("/")({
   component: Home,
-  loader: () => getSession(),
+  loader: ({ context }) => {
+    if (!context.auth) {
+      throw redirect({ to: "/auth" });
+    }
+    void context.queryClient.prefetchQuery(
+      convexQuery(api.auth.currentUser, {})
+    );
+    void context.queryClient.prefetchQuery(
+      convexQuery(api.board.getBoards, {})
+    );
+  },
   pendingComponent: () => <Loader />,
 });
 
 function Home() {
-  const { accessToken, expiresAt } = Route.useLoaderData();
   const handleSignOut = useServerFn(signOut);
   const boardsQuery = useSuspenseQuery(convexQuery(api.board.getBoards, {}));
+  const userQuery = useSuspenseQuery(convexQuery(api.auth.currentUser, {}));
 
   return (
     <div className="p-8 space-y-2">
@@ -35,7 +45,9 @@ function Home() {
           </li>
         ))}
       </ul>
-      <pre>{JSON.stringify({ accessToken, expiresAt }, null, 2)}</pre>
+      <div className="flex items-center gap-2">
+        <pre>{JSON.stringify(userQuery.data, null, 2)}</pre>
+      </div>
       <button onClick={() => handleSignOut()}>Sign out</button>
     </div>
   );

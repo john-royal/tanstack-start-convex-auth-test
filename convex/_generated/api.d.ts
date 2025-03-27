@@ -16,6 +16,7 @@ import type {
 import type * as auth_crypto from "../auth/crypto.js";
 import type * as auth_github from "../auth/github.js";
 import type * as auth_session from "../auth/session.js";
+import type * as auth from "../auth.js";
 import type * as board from "../board.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   "auth/crypto": typeof auth_crypto;
   "auth/github": typeof auth_github;
   "auth/session": typeof auth_session;
+  auth: typeof auth;
   board: typeof board;
   crons: typeof crons;
   http: typeof http;
