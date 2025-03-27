@@ -9,7 +9,7 @@ import { signOut } from "~/utils/actions";
 export const Route = createFileRoute("/")({
   component: Home,
   loader: ({ context }) => {
-    if (!context.auth) {
+    if (!context.auth.isAuthenticated) {
       throw redirect({ to: "/auth" });
     }
     void context.queryClient.prefetchQuery(
