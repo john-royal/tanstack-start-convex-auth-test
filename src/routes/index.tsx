@@ -1,15 +1,20 @@
+import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { convexQuery } from "@convex-dev/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { api } from "convex/_generated/api";
 import { Loader } from "~/components/Loader";
+import { getSession, signOut } from "~/utils/actions";
 
 export const Route = createFileRoute("/")({
   component: Home,
+  loader: () => getSession(),
   pendingComponent: () => <Loader />,
 });
 
 function Home() {
+  const { accessToken, expiresAt } = Route.useLoaderData();
+  const handleSignOut = useServerFn(signOut);
   const boardsQuery = useSuspenseQuery(convexQuery(api.board.getBoards, {}));
 
   return (
@@ -30,6 +35,8 @@ function Home() {
           </li>
         ))}
       </ul>
+      <pre>{JSON.stringify({ accessToken, expiresAt }, null, 2)}</pre>
+      <button onClick={() => handleSignOut()}>Sign out</button>
     </div>
   );
 }

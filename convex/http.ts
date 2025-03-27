@@ -2,7 +2,9 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import * as github from "./auth/github";
 import { requireEnv } from "./utils";
-import { verifyHmac } from "./auth/hmac";
+import { verifyHmac } from "./auth/crypto";
+import { internal } from "./_generated/api";
+import { Tokens } from "./auth/session";
 
 const http = httpRouter();
 
@@ -51,24 +53,29 @@ export type AuthRequest =
   | {
       action: "callback";
       code: string;
+    }
+  | {
+      action: "refresh";
+      refreshToken: string;
+    }
+  | {
+      action: "signout";
+      accessToken: string;
     };
 export type AuthResponse = {
   authorize: {
     url: string;
     state: string;
   };
-  callback: {
-    id: string;
-    name: string;
-    email: string;
-    image: string | undefined;
-  };
+  callback: Tokens;
+  refresh: Tokens;
+  signout: null;
 };
 
 http.route({
   path: "/auth",
   method: "POST",
-  handler: httpAction(async (_, request) => {
+  handler: httpAction(async (ctx, request) => {
     const payload = await request.text();
     const signature = request.headers.get("X-Auth-Signature");
     const timestamp = Number(request.headers.get("X-Auth-Timestamp"));
@@ -93,7 +100,29 @@ http.route({
         }
         case "callback": {
           const res = await github.exchangeAuthorizationCode(body.code);
-          return Response.json(res as AuthResponse["callback"]);
+          const tokens = await ctx.runMutation(
+            internal.auth.session.upsertAccountAndCreateSession,
+            {
+              name: res.name,
+              email: res.email,
+              image: res.image,
+              githubId: res.id,
+            }
+          );
+          return Response.json(tokens as AuthResponse["callback"]);
+        }
+        case "refresh": {
+          const res = await ctx.runMutation(
+            internal.auth.session.refreshAccessToken,
+            {
+              refreshToken: body.refreshToken,
+            }
+          );
+          return Response.json(res as AuthResponse["refresh"]);
+        }
+        case "signout": {
+          await ctx.runMutation(internal.auth.session.signOut);
+          return Response.json(null as AuthResponse["signout"]);
         }
       }
     } catch (error) {

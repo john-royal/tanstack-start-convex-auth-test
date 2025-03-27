@@ -1,5 +1,5 @@
 import { useSession } from "@tanstack/react-start/server";
-import { generateHmac } from "convex/auth/hmac";
+import { generateHmac } from "convex/auth/crypto";
 import { AuthRequest, AuthResponse } from "convex/http";
 import invariant from "tiny-invariant";
 
@@ -8,8 +8,15 @@ interface ChallengeSession {
   state: string;
 }
 
+interface TokenSession {
+  type: "tokens";
+  accessToken: string;
+  accessTokenExpiresAt: number;
+  refreshToken: string;
+}
+
 export function getAppSession() {
-  return useSession<ChallengeSession>({
+  return useSession<ChallengeSession | TokenSession>({
     password: requireEnv("SESSION_SECRET"),
   });
 }
@@ -31,6 +38,11 @@ export async function fetchAuth<T extends AuthRequest>(
       "Content-Type": "application/json",
       "X-Auth-Signature": signature,
       "X-Auth-Timestamp": timestamp.toString(),
+      ...("accessToken" in request
+        ? {
+            Authorization: `Bearer ${request.accessToken}`,
+          }
+        : {}),
     },
     body,
   });

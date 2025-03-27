@@ -1,28 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { Loader } from "~/components/Loader";
-import { fetchAuth, getAppSession } from "~/utils/auth";
-
-const authCallbackSchema = z.object({
-  code: z.string(),
-  state: z.string(),
-});
-
-export const authCallback = createServerFn()
-  .validator(authCallbackSchema)
-  .handler(async ({ data }) => {
-    const session = await getAppSession();
-    if (
-      session.data.type !== "challenge" ||
-      session.data.state !== data.state
-    ) {
-      throw new Error("Invalid state");
-    }
-    await session.clear();
-
-    return await fetchAuth({ action: "callback", code: data.code });
-  });
+import { authCallback, authCallbackSchema } from "~/utils/actions";
 
 export const Route = createFileRoute("/auth/github/callback")({
   component: RouteComponent,

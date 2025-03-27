@@ -52,6 +52,19 @@ export async function verifyHmac({
   );
 }
 
+export async function sha256(data: string) {
+  const hash = await crypto.subtle.digest("SHA-256", encoder.encode(data));
+  return arrayBufferToHexString(hash);
+}
+
+export function generateRandomString(length: number) {
+  const byteArray = new Uint8Array(length);
+  crypto.getRandomValues(byteArray);
+  return Array.from(byteArray)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function arrayBufferToHexString(buffer: ArrayBuffer): string {
   const byteArray = new Uint8Array(buffer);
   return Array.from(byteArray)
