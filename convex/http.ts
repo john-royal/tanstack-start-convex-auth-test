@@ -43,18 +43,41 @@ http.route({
   }),
 });
 
+export type AuthRequest =
+  | {
+      action: "authorize";
+    }
+  | {
+      action: "callback";
+      code: string;
+    };
+export type AuthResponse = {
+  authorize: {
+    url: string;
+    state: string;
+  };
+  callback: {
+    id: string;
+    name: string;
+    email: string;
+    image: string | undefined;
+  };
+};
+
 http.route({
   path: "/auth",
   method: "POST",
   handler: httpAction(async (_, request) => {
-    const body = (await request.json()) as
-      | { action: "authorize" }
-      | { action: "callback"; code: string };
+    const body = (await request.json()) as AuthRequest;
     switch (body.action) {
-      case "authorize":
-        return Response.json(github.generateAuthorizationURL());
-      case "callback":
-        return Response.json(await github.exchangeAuthorizationCode(body.code));
+      case "authorize": {
+        const res = github.generateAuthorizationURL();
+        return Response.json(res as AuthResponse["authorize"]);
+      }
+      case "callback": {
+        const res = await github.exchangeAuthorizationCode(body.code);
+        return Response.json(res as AuthResponse["callback"]);
+      }
     }
   }),
 });

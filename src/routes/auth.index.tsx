@@ -1,17 +1,9 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn, useServerFn } from "@tanstack/react-start";
-import { getAppSession } from "~/utils/auth";
+import { fetchAuth, getAppSession } from "~/utils/auth";
 
 export const redirectToGitHub = createServerFn().handler(async () => {
-  const url = import.meta.env.VITE_CONVEX_URL.replace(".cloud", ".site");
-  const response = await fetch(`${url}/auth`, {
-    method: "POST",
-    body: JSON.stringify({ action: "authorize" }),
-  });
-  const json = (await response.json()) as {
-    url: string;
-    state: string;
-  };
+  const json = await fetchAuth({ action: "authorize" });
   const session = await getAppSession();
   await session.update({
     type: "challenge",

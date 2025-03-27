@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { Loader } from "~/components/Loader";
-import { getAppSession } from "~/utils/auth";
+import { fetchAuth, getAppSession } from "~/utils/auth";
 
 const authCallbackSchema = z.object({
   code: z.string(),
@@ -12,8 +12,6 @@ const authCallbackSchema = z.object({
 export const authCallback = createServerFn()
   .validator(authCallbackSchema)
   .handler(async ({ data }) => {
-    const url = import.meta.env.VITE_CONVEX_URL.replace(".cloud", ".site");
-
     const session = await getAppSession();
     if (
       session.data.type !== "challenge" ||
@@ -23,12 +21,7 @@ export const authCallback = createServerFn()
     }
     await session.clear();
 
-    const response = await fetch(`${url}/auth`, {
-      method: "POST",
-      body: JSON.stringify({ action: "callback", code: data.code }),
-    });
-    const json = await response.json();
-    return json;
+    return await fetchAuth({ action: "callback", code: data.code });
   });
 
 export const Route = createFileRoute("/auth/github/callback")({
