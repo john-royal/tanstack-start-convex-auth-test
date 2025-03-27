@@ -12,9 +12,12 @@ import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
-} from 'convex/server'
-import type * as board from '../board.js'
-import type * as crons from '../crons.js'
+} from "convex/server";
+import type * as auth_github from "../auth/github.js";
+import type * as board from "../board.js";
+import type * as crons from "../crons.js";
+import type * as http from "../http.js";
+import type * as utils from "../utils.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -25,14 +28,17 @@ import type * as crons from '../crons.js'
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  board: typeof board
-  crons: typeof crons
-}>
+  "auth/github": typeof auth_github;
+  board: typeof board;
+  crons: typeof crons;
+  http: typeof http;
+  utils: typeof utils;
+}>;
 export declare const api: FilterApi<
   typeof fullApi,
-  FunctionReference<any, 'public'>
->
+  FunctionReference<any, "public">
+>;
 export declare const internal: FilterApi<
   typeof fullApi,
-  FunctionReference<any, 'internal'>
->
+  FunctionReference<any, "internal">
+>;

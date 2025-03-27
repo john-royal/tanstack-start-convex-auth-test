@@ -12,7 +12,9 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/index'
+import { Route as AuthIndexImport } from './routes/auth.index'
 import { Route as BoardsBoardIdImport } from './routes/boards.$boardId'
+import { Route as AuthGithubCallbackImport } from './routes/auth.github.callback'
 
 // Create/Update Routes
 
@@ -22,9 +24,21 @@ const IndexRoute = IndexImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const AuthIndexRoute = AuthIndexImport.update({
+  id: '/auth/',
+  path: '/auth/',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const BoardsBoardIdRoute = BoardsBoardIdImport.update({
   id: '/boards/$boardId',
   path: '/boards/$boardId',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const AuthGithubCallbackRoute = AuthGithubCallbackImport.update({
+  id: '/auth/github/callback',
+  path: '/auth/github/callback',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -46,6 +60,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BoardsBoardIdImport
       parentRoute: typeof rootRoute
     }
+    '/auth/': {
+      id: '/auth/'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthIndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/auth/github/callback': {
+      id: '/auth/github/callback'
+      path: '/auth/github/callback'
+      fullPath: '/auth/github/callback'
+      preLoaderRoute: typeof AuthGithubCallbackImport
+      parentRoute: typeof rootRoute
+    }
   }
 }
 
@@ -54,36 +82,46 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/boards/$boardId': typeof BoardsBoardIdRoute
+  '/auth': typeof AuthIndexRoute
+  '/auth/github/callback': typeof AuthGithubCallbackRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/boards/$boardId': typeof BoardsBoardIdRoute
+  '/auth': typeof AuthIndexRoute
+  '/auth/github/callback': typeof AuthGithubCallbackRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/boards/$boardId': typeof BoardsBoardIdRoute
+  '/auth/': typeof AuthIndexRoute
+  '/auth/github/callback': typeof AuthGithubCallbackRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/boards/$boardId'
+  fullPaths: '/' | '/boards/$boardId' | '/auth' | '/auth/github/callback'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/boards/$boardId'
-  id: '__root__' | '/' | '/boards/$boardId'
+  to: '/' | '/boards/$boardId' | '/auth' | '/auth/github/callback'
+  id: '__root__' | '/' | '/boards/$boardId' | '/auth/' | '/auth/github/callback'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BoardsBoardIdRoute: typeof BoardsBoardIdRoute
+  AuthIndexRoute: typeof AuthIndexRoute
+  AuthGithubCallbackRoute: typeof AuthGithubCallbackRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BoardsBoardIdRoute: BoardsBoardIdRoute,
+  AuthIndexRoute: AuthIndexRoute,
+  AuthGithubCallbackRoute: AuthGithubCallbackRoute,
 }
 
 export const routeTree = rootRoute
@@ -97,7 +135,9 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
-        "/boards/$boardId"
+        "/boards/$boardId",
+        "/auth/",
+        "/auth/github/callback"
       ]
     },
     "/": {
@@ -105,6 +145,12 @@ export const routeTree = rootRoute
     },
     "/boards/$boardId": {
       "filePath": "boards.$boardId.tsx"
+    },
+    "/auth/": {
+      "filePath": "auth.index.tsx"
+    },
+    "/auth/github/callback": {
+      "filePath": "auth.github.callback.tsx"
     }
   }
 }
