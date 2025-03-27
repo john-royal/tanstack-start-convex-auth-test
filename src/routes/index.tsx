@@ -13,10 +13,10 @@ export const Route = createFileRoute("/")({
       throw redirect({ to: "/auth" });
     }
     void context.queryClient.prefetchQuery(
-      convexQuery(api.auth.currentUser, {})
+      convexQuery(api.board.getBoards, {})
     );
     void context.queryClient.prefetchQuery(
-      convexQuery(api.board.getBoards, {})
+      convexQuery(api.auth.currentUser, {})
     );
   },
   pendingComponent: () => <Loader />,

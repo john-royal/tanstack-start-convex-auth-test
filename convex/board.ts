@@ -14,6 +14,7 @@ import schema, {
   updateColumnSchema,
 } from "./schema";
 import type { Doc, Id } from "./_generated/dataModel";
+import { requireAuth } from "./auth";
 
 export const seed = internalMutation(async (ctx) => {
   const allBoards = await ctx.db.query("boards").collect();
@@ -41,7 +42,7 @@ export const clear = internalMutation(async (ctx) => {
 });
 
 function withoutSystemFields<T extends { _creationTime: number; _id: Id<any> }>(
-  doc: T,
+  doc: T
 ) {
   const { _id, _creationTime, ...rest } = doc;
   return rest;
@@ -69,6 +70,7 @@ async function getFullBoard(ctx: QueryCtx, id: string) {
 }
 
 export const getBoards = query(async (ctx) => {
+  await requireAuth(ctx);
   const boards = await ctx.db.query("boards").collect();
   return await Promise.all(boards.map((b) => getFullBoard(ctx, b.id)));
 });
@@ -76,13 +78,14 @@ export const getBoards = query(async (ctx) => {
 export const getBoard = query({
   args: { id: v.string() },
   handler: async (ctx, { id }) => {
+    await requireAuth(ctx);
     return await getFullBoard(ctx, id);
   },
 });
 
 async function ensureBoardExists(
   ctx: QueryCtx,
-  boardId: string,
+  boardId: string
 ): Promise<Doc<"boards">> {
   const board = await ctx.db
     .query("boards")
@@ -94,7 +97,7 @@ async function ensureBoardExists(
 }
 async function ensureColumnExists(
   ctx: QueryCtx,
-  columnId: string,
+  columnId: string
 ): Promise<Doc<"columns">> {
   const column = await ctx.db
     .query("columns")
@@ -106,7 +109,7 @@ async function ensureColumnExists(
 }
 async function ensureItemExists(
   ctx: QueryCtx,
-  itemId: string,
+  itemId: string
 ): Promise<Doc<"items">> {
   const item = await ctx.db
     .query("items")
@@ -120,14 +123,15 @@ async function ensureItemExists(
 export const createColumn = mutation({
   args: newColumnsSchema,
   handler: async (ctx, { boardId, name }) => {
-    ensureBoardExists(ctx, boardId);
+    await requireAuth(ctx);
+    await ensureBoardExists(ctx, boardId);
 
     const existingColumns = await ctx.db
       .query("columns")
       .withIndex("board", (q) => q.eq("boardId", boardId))
       .collect();
 
-    ctx.db.insert("columns", {
+    await ctx.db.insert("columns", {
       boardId,
       name,
       order: existingColumns.length + 1,
@@ -139,6 +143,7 @@ export const createColumn = mutation({
 export const createItem = mutation({
   args: schema.tables.items.validator,
   handler: async (ctx, item) => {
+    await requireAuth(ctx);
     await ensureBoardExists(ctx, item.boardId);
     await ctx.db.insert("items", item);
   },
@@ -147,6 +152,7 @@ export const createItem = mutation({
 export const deleteItem = mutation({
   args: deleteItemSchema,
   handler: async (ctx, { id, boardId }) => {
+    await requireAuth(ctx);
     await ensureBoardExists(ctx, boardId);
     const item = await ensureItemExists(ctx, id);
     await ctx.db.delete(item._id);
@@ -156,6 +162,7 @@ export const deleteItem = mutation({
 export const updateItem = mutation({
   args: schema.tables.items.validator,
   handler: async (ctx, newItem) => {
+    await requireAuth(ctx);
     const { id, boardId } = newItem;
     await ensureBoardExists(ctx, boardId);
     const item = await ensureItemExists(ctx, id);
@@ -166,6 +173,7 @@ export const updateItem = mutation({
 export const updateColumn = mutation({
   args: updateColumnSchema,
   handler: async (ctx, newColumn) => {
+    await requireAuth(ctx);
     const { id, boardId } = newColumn;
     await ensureBoardExists(ctx, boardId);
     const item = await ensureColumnExists(ctx, id);
@@ -176,6 +184,7 @@ export const updateColumn = mutation({
 export const updateBoard = mutation({
   args: updateBoardSchema,
   handler: async (ctx, boardUpdate) => {
+    await requireAuth(ctx);
     const board = await ensureBoardExists(ctx, boardUpdate.id);
     await ctx.db.patch(board._id, boardUpdate);
   },
@@ -184,6 +193,7 @@ export const updateBoard = mutation({
 export const deleteColumn = mutation({
   args: deleteColumnSchema,
   handler: async (ctx, { boardId, id }) => {
+    await requireAuth(ctx);
     await ensureBoardExists(ctx, boardId);
     const column = await ensureColumnExists(ctx, id);
     const items = await ctx.db

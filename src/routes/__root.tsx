@@ -9,11 +9,12 @@ import {
   useRouteContext,
   useRouter,
   useRouterState,
+  useStableCallback,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { useServerFn } from "@tanstack/react-start";
 import { AuthTokenFetcher, useConvex } from "convex/react";
-import * as React from "react";
+import { useEffect, useRef } from "react";
 import { Toaster } from "react-hot-toast";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { IconLink } from "~/components/IconLink";
@@ -174,14 +175,17 @@ function AuthEffects() {
   const router = useRouter();
   const convex = useConvex();
 
-  const stateRef = React.useRef(state);
-  const fetchServerAuthState = useServerFn(getServerAuthState);
+  const fetchServerAuthState = useStableCallback(
+    useServerFn(getServerAuthState)
+  );
 
-  React.useEffect(() => {
+  const stateRef = useRef(state);
+
+  useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchAccessToken: AuthTokenFetcher = async (opts) => {
       if (
         !opts.forceRefreshToken ||
@@ -206,7 +210,7 @@ function AuthEffects() {
     return () => {
       convex.clearAuth();
     };
-  }, [convex, router, fetchServerAuthState, state.isAuthenticated]);
+  }, [convex, router, state.isAuthenticated]);
 
   return null;
 }

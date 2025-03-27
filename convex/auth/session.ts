@@ -4,6 +4,7 @@ import { SignJWT, importPKCS8 } from "jose";
 import { generateRandomString, sha256 } from "./crypto";
 import { internalMutation, MutationCtx } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
+import { requireAuth } from "../auth";
 
 const ACCESS_TOKEN_TTL = 1000 * 60 * 60;
 const REFRESH_TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;
@@ -60,11 +61,7 @@ export const refreshAccessToken = internalMutation({
 
 export const signOut = internalMutation({
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new ConvexError("Unauthorized");
-    }
-    const sessionId = identity.subject.split(":")[1] as Id<"authSessions">;
+    const { sessionId } = await requireAuth(ctx);
     for await (const token of ctx.db
       .query("authTokens")
       .withIndex("sessionId", (q) => q.eq("sessionId", sessionId))) {

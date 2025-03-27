@@ -7,9 +7,8 @@ export const Route = createFileRoute("/auth/github/callback")({
   validateSearch: authCallbackSchema,
   loaderDeps: ({ search }) => search,
   pendingComponent: () => <Loader />,
-  pendingMinMs: 0,
   pendingMs: 0,
-  loader: async ({ deps }) => authCallback({ data: deps }),
+  loader: async ({ deps }) => await authCallback({ data: deps }),
 });
 
 function RouteComponent() {

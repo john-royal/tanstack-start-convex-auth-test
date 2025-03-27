@@ -1,36 +1,32 @@
-import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import {
   MutationCache,
   QueryClient,
   notifyManager,
 } from "@tanstack/react-query";
+import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { routerWithQueryClient } from "@tanstack/react-router-with-query";
-import toast from "react-hot-toast";
-import { ConvexQueryClient } from "./utils/query-client";
 import { ConvexProvider } from "convex/react";
-import { routeTree } from "./routeTree.gen";
+import toast from "react-hot-toast";
 import { DefaultCatchBoundary } from "./components/DefaultCatchBoundary";
 import { NotFound } from "./components/NotFound";
-import invariant from "tiny-invariant";
+import { routeTree } from "./routeTree.gen";
 import { getServerAuthState } from "./utils/actions";
+import { ConvexQueryClient } from "./utils/query-client";
+
 export function createRouter() {
   if (typeof document !== "undefined") {
     notifyManager.setScheduler(window.requestAnimationFrame);
   }
 
-  const CONVEX_URL = import.meta.env.VITE_CONVEX_URL;
-  invariant(CONVEX_URL, "missing environment variable VITE_CONVEX_URL");
-
   const authPromise =
     typeof window === "undefined" ? getServerAuthState() : undefined;
-
-  const convexQueryClient = new ConvexQueryClient(CONVEX_URL, {
-    serverAccessTokenPromise: authPromise?.then(
-      (authState) => authState?.accessToken
-    ),
-  });
-
-  const queryClient: QueryClient = new QueryClient({
+  const convexQueryClient = new ConvexQueryClient(
+    import.meta.env.VITE_CONVEX_URL,
+    {
+      fetchServerAuthState: authPromise ? () => authPromise : undefined,
+    }
+  );
+  const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         queryKeyHashFn: convexQueryClient.hashFn(),

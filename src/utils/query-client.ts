@@ -7,28 +7,28 @@ import type {
   QueryFunctionContext,
   QueryKey,
 } from "@tanstack/react-query";
-import { ConvexReactClient } from "convex/react";
 import type { FunctionReference, FunctionReturnType } from "convex/server";
+import { getServerAuthState, type AuthState } from "./actions";
 
 export interface ConvexQueryClientOptions extends ConvexQueryClientOptionsBase {
-  serverAccessTokenPromise?: Promise<string | null | undefined>;
+  fetchServerAuthState?: () => Promise<AuthState>;
 }
 
 export class ConvexQueryClient extends ConvexQueryClientBase {
-  didServerAuthCheck = false;
   serverAccessTokenPromise?: Promise<void>;
 
   constructor(
-    client: ConvexReactClient | string,
-    { serverAccessTokenPromise, ...options }: ConvexQueryClientOptions
+    address: string,
+    { fetchServerAuthState, ...options }: ConvexQueryClientOptions = {}
   ) {
-    super(client, options);
-    if (this.serverHttpClient && serverAccessTokenPromise) {
-      const serverHttpClient = this.serverHttpClient;
-      this.serverAccessTokenPromise = serverAccessTokenPromise.then((token) => {
-        this.didServerAuthCheck = true;
-        if (token) {
-          serverHttpClient.setAuth(token);
+    super(address, options);
+    if (this.serverHttpClient) {
+      this.serverAccessTokenPromise = (
+        fetchServerAuthState ?? getServerAuthState
+      )().then((authState) => {
+        if (authState?.accessToken) {
+          this.serverHttpClient?.setAuth(authState.accessToken);
+          this.serverAccessTokenPromise = undefined;
         }
       });
     }
@@ -41,7 +41,7 @@ export class ConvexQueryClient extends ConvexQueryClientBase {
     >(
       context: QueryFunctionContext<ReadonlyArray<unknown>>
     ): Promise<FunctionReturnType<ConvexQueryReference>> => {
-      if (this.serverHttpClient && !this.didServerAuthCheck) {
+      if (this.serverAccessTokenPromise) {
         await this.serverAccessTokenPromise;
       }
       return queryFn(context);
