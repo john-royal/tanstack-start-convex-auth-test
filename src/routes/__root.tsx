@@ -159,6 +159,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
 function LoadingIndicator() {
   const isLoading = useRouterState({ select: (s) => s.isLoading });
+
   return (
     <div
       className={`h-12 transition-all duration-300 ${
@@ -196,21 +197,19 @@ function AuthEffects() {
       const newState = await fetchServerAuthState({
         data: opts,
       });
+      if (newState.isAuthenticated !== stateRef.current.isAuthenticated) {
+        await router.invalidate();
+      }
       stateRef.current = newState;
       return newState.accessToken;
     };
-    const onAuthStateChange = (isAuthenticated: boolean) => {
-      if (isAuthenticated !== state.isAuthenticated) {
-        router.invalidate();
-      }
-    };
 
-    convex.setAuth(fetchAccessToken, onAuthStateChange);
+    convex.setAuth(fetchAccessToken);
 
     return () => {
       convex.clearAuth();
     };
-  }, [convex, router, state.isAuthenticated]);
+  }, [convex, router]);
 
   return null;
 }
