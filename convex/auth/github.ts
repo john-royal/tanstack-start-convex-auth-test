@@ -6,7 +6,7 @@ const github = () =>
   new GitHub(
     requireEnv("AUTH_GITHUB_ID"),
     requireEnv("AUTH_GITHUB_SECRET"),
-    requireEnv("CONVEX_SITE_URL") + "/auth/github/callback"
+    requireEnv("WEB_URL") + "/auth/github/callback"
   );
 
 export const generateAuthorizationURL = () => {
