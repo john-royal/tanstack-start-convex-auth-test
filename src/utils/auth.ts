@@ -7,9 +7,9 @@ interface ChallengeSession {
 }
 
 export function getAppSession() {
-  invariant(process.env.SESSION_SECRET, "env.SESSION_SECRET is not set");
-
+  const password = process.env.SESSION_SECRET;
+  invariant(password, "Missing environment variable SESSION_SECRET");
   return useSession<ChallengeSession>({
-    password: process.env.SESSION_SECRET,
+    password,
   });
 }
