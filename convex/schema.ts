@@ -20,6 +20,7 @@ const schema = defineSchema({
     type: v.literal("refresh"),
     token: v.string(),
     sessionId: v.id("authSessions"),
+    firstUsedAt: v.optional(v.number()),
     expiresAt: v.number(),
   })
     .index("token", ["token"])

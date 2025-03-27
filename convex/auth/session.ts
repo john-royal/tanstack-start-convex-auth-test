@@ -1,5 +1,5 @@
 import { requireEnv } from "../utils";
-import { Id } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
 import { SignJWT, importPKCS8 } from "jose";
 import { generateRandomString, sha256 } from "./crypto";
 import { internalMutation, MutationCtx } from "../_generated/server";
@@ -8,6 +8,7 @@ import { requireAuth } from "../auth";
 
 const ACCESS_TOKEN_TTL = 1000 * 60 * 60;
 const REFRESH_TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;
+const REFRESH_TOKEN_REUSE_INTERVAL = 1000 * 60;
 const SESSION_TTL = 1000 * 60 * 60 * 24 * 30;
 
 export const upsertAccountAndCreateSession = internalMutation({
@@ -36,14 +37,7 @@ export const refreshAccessToken = internalMutation({
     refreshToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const tokenSha256 = await sha256(args.refreshToken);
-    const token = await ctx.db
-      .query("authTokens")
-      .withIndex("token", (q) => q.eq("token", tokenSha256))
-      .unique();
-    if (!token || token.expiresAt < Date.now()) {
-      throw new ConvexError("Invalid refresh token");
-    }
+    const token = await validateRefreshToken(ctx, args.refreshToken);
     const session = await ctx.db.get(token.sessionId);
     if (!session || session.expiresAt < Date.now()) {
       throw new ConvexError("Invalid session");
@@ -53,11 +47,35 @@ export const refreshAccessToken = internalMutation({
       ctx.db.patch(session._id, {
         expiresAt: Date.now() + SESSION_TTL,
       }),
-      ctx.db.delete(token._id),
+      invalidateRefreshToken(ctx, token),
     ]);
     return tokens;
   },
 });
+
+const validateRefreshToken = async (ctx: MutationCtx, refreshToken: string) => {
+  const tokenSha256 = await sha256(refreshToken);
+  const token = await ctx.db
+    .query("authTokens")
+    .withIndex("token", (q) => q.eq("token", tokenSha256))
+    .unique();
+  if (!token || token.expiresAt < Date.now()) {
+    throw new ConvexError("Invalid refresh token");
+  }
+  return token;
+};
+
+const invalidateRefreshToken = async (
+  ctx: MutationCtx,
+  { _id, firstUsedAt }: Doc<"authTokens">
+) => {
+  if (!firstUsedAt) {
+    await ctx.db.patch(_id, {
+      firstUsedAt: Date.now(),
+      expiresAt: Date.now() + REFRESH_TOKEN_REUSE_INTERVAL,
+    });
+  }
+};
 
 export const signOut = internalMutation({
   handler: async (ctx) => {
