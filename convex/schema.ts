@@ -2,6 +2,31 @@ import { defineSchema, defineTable } from "convex/server";
 import { type Infer, v } from "convex/values";
 
 const schema = defineSchema({
+  users: defineTable({
+    name: v.string(),
+    email: v.string(),
+    image: v.optional(v.string()),
+  }),
+
+  authAccounts: defineTable({
+    userId: v.id("users"),
+    provider: v.string(),
+    providerAccountId: v.string(),
+  }).index("by_providerAccountId", ["provider", "providerAccountId"]),
+
+  authSessions: defineTable({
+    userId: v.id("users"),
+    expiresAt: v.number(),
+  }).index("by_expiresAt", ["expiresAt"]),
+
+  authRefreshTokens: defineTable({
+    userId: v.id("users"),
+    sessionId: v.id("authSessions"),
+    expiresAt: v.number(),
+  })
+    .index("by_sessionId", ["sessionId"])
+    .index("by_expiresAt", ["expiresAt"]),
+
   boards: defineTable({
     id: v.string(),
     name: v.string(),

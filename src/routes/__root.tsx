@@ -1,25 +1,37 @@
+import { type QueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools/production";
 import {
+  HeadContent,
   Link,
   Outlet,
-  createRootRouteWithContext,
-  useRouterState,
-  HeadContent,
   Scripts,
+  createRootRouteWithContext,
+  useRouteContext,
+  useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import { useServerFn } from "@tanstack/react-start";
+import { AuthTokenFetcher, useConvex } from "convex/react";
 import * as React from "react";
 import { Toaster } from "react-hot-toast";
-import type { QueryClient } from "@tanstack/react-query";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { IconLink } from "~/components/IconLink";
-import { NotFound } from "~/components/NotFound";
-import appCss from "~/styles/app.css?url";
-import { seo } from "~/utils/seo";
 import { Loader } from "~/components/Loader";
+import { NotFound } from "~/components/NotFound";
+import { LoginIcon, LogoutIcon } from "~/icons/icons";
+import appCss from "~/styles/app.css?url";
+import {
+  AuthState,
+  getServerAuthState,
+  redirectToGitHub,
+  signOut,
+} from "~/utils/auth";
+import { seo } from "~/utils/seo";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
+  auth: AuthState;
 }>()({
   head: () => ({
     meta: [
@@ -68,17 +80,34 @@ export const Route = createRootRouteWithContext<{
   },
   notFoundComponent: () => <NotFound />,
   component: RootComponent,
+  beforeLoad: async ({ context }) => {
+    if (context.auth) {
+      const promise = context.auth as unknown as Promise<AuthState>;
+      return { auth: await promise };
+    }
+    return {
+      auth: await getServerAuthState({ data: {} }),
+    };
+  },
 });
 
 function RootComponent() {
   return (
     <RootDocument>
+      <AuthEffects />
       <Outlet />
     </RootDocument>
   );
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useRouteContext({
+    from: "__root__",
+    select: (m) => m.auth,
+  });
+  const handleSignIn = useServerFn(redirectToGitHub);
+  const handleSignOut = useServerFn(signOut);
+
   return (
     <html>
       <head>
@@ -125,6 +154,23 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 icon="/tanstack.png"
                 label="TanStack"
               />
+              {isAuthenticated ? (
+                <button
+                  onClick={() => handleSignOut()}
+                  className="text-slate-500 text-xs uppercase font-bold text-center"
+                >
+                  <LogoutIcon />
+                  <span className="block mt-2">Sign out</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => void handleSignIn()}
+                  className="text-slate-500 text-xs uppercase font-bold text-center"
+                >
+                  <LoginIcon />
+                  <span className="block mt-2">Sign in</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -152,4 +198,47 @@ function LoadingIndicator() {
       <Loader />
     </div>
   );
+}
+
+function AuthEffects() {
+  const state = useRouteContext({ from: "__root__", select: (m) => m.auth });
+  const router = useRouter();
+  const convex = useConvex();
+
+  const stateRef = React.useRef(state);
+  const fetchServerAuthState = useServerFn(getServerAuthState);
+
+  React.useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  React.useEffect(() => {
+    const fetchAccessToken: AuthTokenFetcher = async (opts) => {
+      if (
+        !opts.forceRefreshToken ||
+        stateRef.current.fetchedAt > Date.now() - 1000 * 30
+      ) {
+        return stateRef.current.token;
+      }
+      const newState = await fetchServerAuthState({
+        data: opts,
+      });
+      stateRef.current = newState;
+      return newState.token;
+    };
+    const onAuthStateChange = (isAuthenticated: boolean) => {
+      if (isAuthenticated !== state.isAuthenticated) {
+        console.log("invalidating router");
+        router.invalidate();
+      }
+    };
+
+    convex.setAuth(fetchAccessToken, onAuthStateChange);
+
+    return () => {
+      convex.clearAuth();
+    };
+  }, [convex, router, fetchServerAuthState, state.isAuthenticated]);
+
+  return null;
 }

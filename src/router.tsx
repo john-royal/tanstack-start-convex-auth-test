@@ -1,27 +1,34 @@
-import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import {
   MutationCache,
   QueryClient,
   notifyManager,
 } from "@tanstack/react-query";
+import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { routerWithQueryClient } from "@tanstack/react-router-with-query";
-import toast from "react-hot-toast";
-import { ConvexQueryClient } from "@convex-dev/react-query";
 import { ConvexProvider } from "convex/react";
-import { routeTree } from "./routeTree.gen";
+import toast from "react-hot-toast";
 import { DefaultCatchBoundary } from "./components/DefaultCatchBoundary";
 import { NotFound } from "./components/NotFound";
+import { routeTree } from "./routeTree.gen";
+import { ConvexQueryClient } from "./utils/query-client";
+import { AuthState, getServerAuthState } from "./utils/auth";
+import { env } from "./utils/env";
 
 export function createRouter() {
   if (typeof document !== "undefined") {
     notifyManager.setScheduler(window.requestAnimationFrame);
   }
 
-  const CONVEX_URL = (import.meta as any).env.VITE_CONVEX_URL!;
-  if (!CONVEX_URL) {
-    console.error("missing envar CONVEX_URL");
-  }
-  const convexQueryClient = new ConvexQueryClient(CONVEX_URL);
+  const serverAuthStatePromise =
+    typeof window !== "undefined"
+      ? undefined
+      : getServerAuthState({ data: {} });
+
+  const convexQueryClient = new ConvexQueryClient(env.VITE_CONVEX_URL, {
+    serverAccessTokenPromise: serverAuthStatePromise?.then(
+      (state) => state.token
+    ),
+  });
 
   const queryClient: QueryClient = new QueryClient({
     defaultOptions: {
@@ -44,7 +51,10 @@ export function createRouter() {
       defaultPreload: "intent",
       defaultErrorComponent: DefaultCatchBoundary,
       defaultNotFoundComponent: () => <NotFound />,
-      context: { queryClient },
+      context: {
+        queryClient,
+        auth: serverAuthStatePromise as unknown as AuthState,
+      },
       Wrap: ({ children }) => (
         <ConvexProvider client={convexQueryClient.convexClient}>
           {children}
@@ -52,7 +62,7 @@ export function createRouter() {
       ),
       scrollRestoration: true,
     }),
-    queryClient,
+    queryClient
   );
 
   return router;
